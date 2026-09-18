@@ -10,6 +10,9 @@ struct ClaudeAccountCard: Equatable, Sendable {
     var swapAccount: ClaudeSwapAccount? = nil
     var additionalLogDirectories: [String] = []
     var organizationName: String? = nil
+    /// The `AdditionalHomesSetting` Claude home this card's credentials live in, when the account
+    /// is signed in there rather than at the default home.
+    var configDirectory: String? = nil
 }
 
 /// The launch-time account pass: read which account is signed in at each family's default home,
@@ -54,7 +57,8 @@ struct ProviderAccountAssembly {
         return await make(
             observer: DefaultAccountObserver(),
             accountsStore: ProviderAccountsStore(defaults: defaults),
-            families: families
+            families: families,
+            additionalHomes: AdditionalHomesSetting(defaults: defaults)
         )
     }
 
@@ -75,6 +79,7 @@ struct ProviderAccountAssembly {
         accountsStore: ProviderAccountsStore,
         families: Set<String> = ProviderAccountID.families,
         listCodexHomeDirectories: @escaping @Sendable (String) -> [String] = CodexHomeScanner.listSubdirectories,
+        additionalHomes: AdditionalHomesSetting = AdditionalHomesSetting(),
         desktop: ClaudeDesktopAuthStore? = nil,
         listDesktopOrganizationDirectories: @escaping @Sendable (URL) -> [String] = { root in
             let urls = (try? FileManager.default.contentsOfDirectory(
@@ -144,7 +149,33 @@ struct ProviderAccountAssembly {
             }
         }
 
-        if let claudeIdentity = identityKeys["claude"], !claudeIdentity.contains("|"), swapAccounts.isEmpty {
+        // Extra Claude homes the user listed: each names its own account from its `.claude.json`.
+        // Never guessed — an entry that can't name its account is logged and skipped.
+        var additionalClaudeHomes: [(home: String, identityKey: String, label: String?)] = []
+        for home in additionalHomes.claude {
+            switch observer.observeClaude(home: home) {
+            case .resolved(let identityKey, let label, let anchor):
+                additionalClaudeHomes.append((anchor, identityKey, label))
+                let source = ProviderAccountSource(kind: .additionalHome, anchor: anchor, holdsDefaultSource: false)
+                if let index = observations.firstIndex(where: {
+                    $0.family == "claude" && $0.identityKey == identityKey
+                }) {
+                    if !observations[index].sources.contains(source) { observations[index].sources.append(source) }
+                } else {
+                    observations.append(ProviderAccountsStore.Observation(
+                        family: "claude", identityKey: identityKey, label: label, sources: [source]
+                    ))
+                }
+                AppLog.info(.config, "accounts: additional Claude home resolved (\(ProviderAccountID.make(family: "claude", identityKey: identityKey))): \(anchor)")
+            case .unresolved(let reason):
+                AppLog.warn(.config, "accounts: additional Claude home skipped — \(reason): \(home)")
+            case .absent:
+                AppLog.warn(.config, "accounts: additional Claude home has no login; skipped: \(home)")
+            }
+        }
+
+        if let claudeIdentity = identityKeys["claude"], !claudeIdentity.contains("|"),
+           swapAccounts.isEmpty, additionalClaudeHomes.isEmpty {
             accountsStore.reconcile(with: observations)
             return ProviderAccountAssembly(identityKeysByCard: identityKeys, codex: codex)
         }
@@ -248,8 +279,33 @@ struct ProviderAccountAssembly {
             ))
             identityKeys[record.id] = account.identityKey
         }
+        for entry in additionalClaudeHomes {
+            // The default login or a Swap slot already answers for this account: the home is only
+            // one more log root for that card (attached below), never a duplicate card.
+            guard !cards.contains(where: { $0.identityKey == entry.identityKey }),
+                  let record = records.first(where: {
+                      $0.family == "claude" && $0.identityKey == entry.identityKey && !$0.removedTombstone
+                  })
+            else { continue }
+            let parts = entry.identityKey.split(separator: "|")
+            let organization = parts.count == 2 ? String(parts[1]) : nil
+            // The observer label is "email (Org Name)"; the parenthesised part is the org name.
+            let organizationName = entry.label.flatMap { label in
+                organizationLabel(label).flatMap { $0 == label ? nil : $0 }
+            }
+            let fallbackLabel = organization.map { "Organization \($0.prefix(8))" } ?? "Additional Login"
+            cards.append(ClaudeAccountCard(
+                id: record.id, identityKey: entry.identityKey, organizationID: organization,
+                displayName: "Claude: \(entry.label ?? fallbackLabel)",
+                usesDesktopCredentials: false, allowsUnattributedPiUsage: allowsUnattributedPiUsage,
+                organizationName: organizationName, configDirectory: entry.home
+            ))
+            identityKeys[record.id] = entry.identityKey
+        }
+        // Every card scans every known root; the scanner keeps only sessions its own account owns.
+        let sharedLogDirectories = swapAccounts.map(\.sessionDirectory) + additionalClaudeHomes.map(\.home)
         for index in cards.indices {
-            cards[index].additionalLogDirectories = swapAccounts.map(\.sessionDirectory)
+            cards[index].additionalLogDirectories = sharedLogDirectories
         }
         return ProviderAccountAssembly(identityKeysByCard: identityKeys, claudeCards: cards, codex: codex)
     }

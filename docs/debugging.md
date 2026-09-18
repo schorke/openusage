@@ -58,6 +58,10 @@ short trail in the log file:
   with certainty this launch (an auth file without an account id, or a keychain credential whose
   secret we don't read at launch). The card works as before; it just can't participate in
   account-aware features yet.
+- `accounts: additional Claude home resolved (claude@<hash>): <path>` — a home listed in
+  `openusage.claudeAdditionalHomes` named its account and got a card.
+  `accounts: additional Claude home skipped — …` means the listed directory holds no identity file
+  or no login; fix the path or sign in there first.
 - `stale account cache discarded for claude` — the account at the default home changed between
   launches, so the previous account's cached snapshot was dropped instead of painting under the new
   login.

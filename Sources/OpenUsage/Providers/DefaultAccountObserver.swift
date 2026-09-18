@@ -81,6 +81,12 @@ struct DefaultAccountObserver: Sendable {
             }
             configDir = raw
         }
+        return observeClaude(home: configDir)
+    }
+
+    /// The same identity read against one explicit Claude home — an `AdditionalHomesSetting` entry
+    /// the user signs into with `CLAUDE_CONFIG_DIR=<home> claude`. Never reads a credential.
+    func observeClaude(home configDir: String) -> Outcome {
         let anchor = expandTilde(configDir)
         // The identity file sits inside a custom config dir, but next to (not inside) the default
         // `~/.claude` — Claude Code keeps the default's state at `~/.claude.json`.

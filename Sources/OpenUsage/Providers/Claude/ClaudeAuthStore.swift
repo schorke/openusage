@@ -76,6 +76,10 @@ struct ClaudeAuthStore: Sendable {
     let expectedIdentityKey: String?
     let desktopOnly: Bool
     let swapAccount: ClaudeSwapAccount?
+    /// An `AdditionalHomesSetting` Claude home this store is pinned to. Credentials come from that
+    /// directory's own Keychain item / credential file only — never the default login or an
+    /// environment token, which belong to another account.
+    let configDirectory: String?
     let preferOrganizationScopedDesktop: Bool
 
     init(
@@ -87,6 +91,7 @@ struct ClaudeAuthStore: Sendable {
         expectedIdentityKey: String? = nil,
         desktopOnly: Bool = false,
         swapAccount: ClaudeSwapAccount? = nil,
+        configDirectory: String? = nil,
         preferOrganizationScopedDesktop: Bool = false,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
@@ -98,6 +103,7 @@ struct ClaudeAuthStore: Sendable {
         self.expectedIdentityKey = expectedIdentityKey?.lowercased() ?? swapAccount?.identityKey
         self.desktopOnly = desktopOnly
         self.swapAccount = swapAccount
+        self.configDirectory = configDirectory
         self.preferOrganizationScopedDesktop = preferOrganizationScopedDesktop
         self.now = now
     }
@@ -140,7 +146,7 @@ struct ClaudeAuthStore: Sendable {
         let hasUsableCLILogin = stored.contains {
             $0.hasUsableAccessToken && liveUsageAvailability($0) == .available
         }
-        if swapAccount != nil || forceDesktopFallback || !hasUsableCLILogin || preferOrganizationScopedDesktop {
+        if isScopedHome || forceDesktopFallback || !hasUsableCLILogin || preferOrganizationScopedDesktop {
             let expectedUser = expectedIdentityKey?.split(separator: "|").first.map(String.init)
             let result = desktop.load(
                 allowInteraction: allowDesktopInteraction,
@@ -154,18 +160,18 @@ struct ClaudeAuthStore: Sendable {
                     source: .desktop,
                     fullData: nil,
                     inferenceOnly: false
-                ), at: swapAccount != nil && !desktopOnly && !preferOrganizationScopedDesktop
+                ), at: isScopedHome && !desktopOnly && !preferOrganizationScopedDesktop
                     ? stored.count : 0)
             }
         }
 
         // A scope-limited login produces a local-only snapshot, so try every live-capable matching
         // source first. Preserve source preference within each group, including Desktop preference.
-        if swapAccount != nil {
+        if isScopedHome {
             stored = stored.filter { liveUsageAvailability($0) == .available }
                 + stored.filter { liveUsageAvailability($0) != .available }
         }
-        let candidates = desktopOnly || swapAccount != nil ? stored : applyingEnvironmentToken(to: stored)
+        let candidates = desktopOnly || isScopedHome ? stored : applyingEnvironmentToken(to: stored)
         return ClaudeCredentialLoad(candidates: candidates, desktopStatus: desktopStatus)
     }
 
@@ -271,8 +277,12 @@ struct ClaudeAuthStore: Sendable {
     }
 
     func claudeHomeOverride() -> String? {
-        swapAccount?.sessionDirectory ?? envText("CLAUDE_CONFIG_DIR")
+        swapAccount?.sessionDirectory ?? configDirectory ?? envText("CLAUDE_CONFIG_DIR")
     }
+
+    /// True when this store speaks for one specific home (a Swap session profile or an additional
+    /// home) rather than the machine's default login.
+    private var isScopedHome: Bool { swapAccount != nil || configDirectory != nil }
 
     // Resolved OAuth endpoint strings before URL validation. The suffix is derived from the same
     // env-var branching as the URLs but never depends on URL validity, so the (non-throwing) keychain
@@ -343,7 +353,7 @@ struct ClaudeAuthStore: Sendable {
         let base = "\(Self.keychainServicePrefix)\(resolveOAuthEndpoints().suffix)-credentials"
         if let configDir = claudeHomeOverride() {
             let scoped = "\(base)-\(hashSuffix(configDir))"
-            return swapAccount == nil ? [scoped, base] : [scoped]
+            return isScopedHome ? [scoped] : [scoped, base]
         }
         return [base]
     }

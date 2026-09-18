@@ -34,6 +34,7 @@ enum ProviderCatalog {
                         expectedIdentityKey: identity,
                         desktopOnly: card.usesDesktopCredentials,
                         swapAccount: card.swapAccount,
+                        configDirectory: card.configDirectory,
                         preferOrganizationScopedDesktop: claudeCards.count > 1
                             && card.organizationID != nil && !card.usesDesktopCredentials
                     ),

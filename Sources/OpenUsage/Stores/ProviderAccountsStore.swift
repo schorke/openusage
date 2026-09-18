@@ -34,6 +34,9 @@ struct ProviderAccountSource: Codable, Equatable, Sendable {
         case codexSwap
         case codexHome
         case pi
+        /// A user-listed extra home (`AdditionalHomesSetting`): a `CLAUDE_CONFIG_DIR` directory
+        /// signed into outside the default home.
+        case additionalHome
     }
 
     var kind: Kind
