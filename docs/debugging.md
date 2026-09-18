@@ -62,6 +62,9 @@ short trail in the log file:
   `openusage.claudeAdditionalHomes` named its account and got a card.
   `accounts: additional Claude home skipped — …` means the listed directory holds no identity file
   or no login; fix the path or sign in there first.
+- `[auth:claude] using setup-token from settings.json of the additional home` — a listed Claude home
+  is signed in through `claude setup-token`; the card is logged in but inference-only, so only the
+  spend tiles load.
 - `stale account cache discarded for claude` — the account at the default home changed between
   launches, so the previous account's cached snapshot was dropped instead of painting under the new
   login.

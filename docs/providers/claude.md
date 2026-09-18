@@ -120,6 +120,17 @@ Desktop-only card and keeps its id, order and pins. A listed home whose login is
 Keychain item holds empty tokens) shows **Not logged in** until you run `claude` in that home and
 sign in again; watch for `[keychain] read miss service=Claude Code-credentials-<hash>` in the log.
 
+A home signed in through `claude setup-token` keeps that token in the `env` block of its
+`settings.json` (or `settings.local.json`) as `CLAUDE_CODE_OAUTH_TOKEN`. OpenUsage reads it from
+those files only, never from your shell environment, so the card counts as logged in. Such a token
+is inference-only: the spend tiles load from the home's session logs, but the Session and Weekly
+meters cannot load until a real `claude` login exists in that home.
+
+Sessions written by a setup-token login record no owner. Each additional home holds exactly one
+login, so sessions under its `projects/` folder count for that home's card even without an owner
+mark. The default home's unowned sessions count for the default card in the same way, as long as no
+Claude Swap account rotates that home.
+
 ## The spend tiles
 
 Today / Yesterday / Last 30 Days are computed **locally**: OpenUsage reads the Claude Code session logs under `~/.claude/projects/` (or `$CLAUDE_CONFIG_DIR`) itself — no external tools needed. Symlinks are followed, so a projects folder linked into a synced location (say, a Dropbox folder) is read all the same. With one known account, Claude usage from the [pi](https://github.com/earendil-works/pi) coding agent counts too: OpenUsage reads pi's session logs under `~/.pi/agent/sessions/` (or `$PI_CODING_AGENT_SESSION_DIR`) and folds any Claude usage there into the same tiles and trend, so a Claude sub driven through pi still shows up here. pi records its own per-message cost, so those dollars come straight from pi rather than being re-estimated. Cowork (the Claude desktop app's agent mode) counts too: it writes the same logs into per-session folders under `~/Library/Application Support/Claude/local-agent-mode-sessions/`, and OpenUsage scans those as well, so desktop agent sessions show up in the tiles alongside terminal ones. Persisted `claude -p` runs count as well. Runs made with `--no-session-persistence` cannot appear because Claude deliberately writes no session log for OpenUsage to read. Advisor work recorded inside a message is counted once under the advisor's own model; the parent's main-model totals are kept separate, and ordinary iteration details are not counted again. A log's recorded fast or standard speed controls its price; OpenUsage does not infer speed from the event date. Days are grouped in your Mac's local time zone, so they line up with your own calendar. Each period is one tile showing cost and tokens together (`$4.08 · 1.2M tokens`); a day with no usage reads **No data** rather than a misleading `$0.00 · 0 tokens` — the same as every other spend-tracking provider. The live Session and Weekly meters are unaffected. The dollars are estimated from token counts at API rates (that's the ⓘ) using the shared [model pricing](../pricing.md); the token counts themselves are measured. No log data leaves your Mac.

@@ -34,6 +34,9 @@ actor ClaudeLogUsageScanner {
     /// also owns the default home's sessions that record no account, which is how plain terminal
     /// sessions look; Desktop-indexed sessions stay excluded.
     private let currentDefaultLoginIdentity: @Sendable () -> String?
+    /// Homes whose `projects/` sessions belong to this card even when they record no owner: an
+    /// additional home holds exactly one login, so its unattributed sessions are that login's.
+    private let ownedUnattributedDirectories: [String]
     private var sessionOwnership: [String: (
         size: Int, mtime: Date, identity: ClaudeSessionIdentity
     )] = [:]
@@ -78,6 +81,7 @@ actor ClaudeLogUsageScanner {
         allowsUnattributedSessions: Bool = false,
         currentDefaultLoginIdentity: (@Sendable () -> String?)? = nil,
         additionalConfigDirectories: [String] = [],
+        ownedUnattributedDirectories: [String] = [],
         readOwnershipData: @escaping @Sendable (URL) throws -> Data = {
             try Data(contentsOf: $0, options: .mappedIfSafe)
         }
@@ -96,6 +100,7 @@ actor ClaudeLogUsageScanner {
             guard case let .resolved(identityKey, _, _) = observer.observeClaude() else { return nil }
             return identityKey
         }
+        self.ownedUnattributedDirectories = ownedUnattributedDirectories
         self.readOwnershipData = readOwnershipData
     }
 
@@ -121,8 +126,11 @@ actor ClaudeLogUsageScanner {
         }
 
         var files = Self.usageFiles(under: roots)
-        if organizationID != nil || claimsDefaultHome {
-            files = ownedUsageFiles(files, claimsDefaultHome: claimsDefaultHome)
+        if organizationID != nil || claimsDefaultHome || !ownedUnattributedDirectories.isEmpty {
+            files = ownedUsageFiles(
+                files, claimsDefaultHome: claimsDefaultHome,
+                ownedHomes: ownedUnattributedDirectories.map(expandHome)
+            )
         }
         guard !Task.isCancelled else { return nil }
         guard !files.isEmpty else {
@@ -283,8 +291,12 @@ actor ClaudeLogUsageScanner {
     /// inherit their parent session's ownership. Keep this outside the shared parsed-entry cache.
     private func ownedUsageFiles(
         _ files: [JSONLScanning.DiscoveredFile],
-        claimsDefaultHome: Bool
+        claimsDefaultHome: Bool,
+        ownedHomes: [String] = []
     ) -> [JSONLScanning.DiscoveredFile] {
+        let ownedPrefixes = ownedHomes.map {
+            URL(fileURLWithPath: $0).appendingPathComponent("projects").resolvingSymlinksInPath().path + "/"
+        }
         let coworkPrefix = homeDirectory()
             .appendingPathComponent("Library/Application Support/Claude/local-agent-mode-sessions")
             .resolvingSymlinksInPath().path + "/"
@@ -326,6 +338,8 @@ actor ClaudeLogUsageScanner {
                     ownedFiles.append(file)
                 }
             } else if allowsUnattributedSessions {
+                ownedFiles.append(file)
+            } else if ownedPrefixes.contains(where: { canonicalPath.hasPrefix($0) }) {
                 ownedFiles.append(file)
             } else {
                 let sessionID = URL(fileURLWithPath: sessionFile.path)

@@ -148,4 +148,74 @@ final class AdditionalHomeAccountTests: XCTestCase {
         keychain.currentUserValues.removeValue(forKey: scoped)
         XCTAssertTrue(store.loadCredentialCandidates().isEmpty, "no fallback to another account's login")
     }
+
+    func testPinnedClaudeStoreUsesTheSetupTokenFromItsOwnSettingsFiles() throws {
+        let work = "/Users/dev/.claude-work"
+        let files = FakeFiles([
+            work + "/settings.json": #"{"env":{"CLAUDE_CODE_OAUTH_TOKEN":"settings-token"}}"#,
+        ])
+        let keychain = ServiceKeychain(currentUserValues: ["Claude Code-credentials": credentials("default-account")])
+        let store = ClaudeAuthStore(
+            environment: FakeEnvironment(["CLAUDE_CODE_OAUTH_TOKEN": "env-token"]),
+            files: files, keychain: keychain, expectedIdentityKey: "\(userB)|\(orgB)", configDirectory: work
+        )
+
+        // Signed in through `claude setup-token`: inference-only, but logged in. The process
+        // environment token belongs to whatever shell exported it, never to this home.
+        let candidates = store.loadCredentialCandidates()
+        XCTAssertEqual(candidates.map(\.oauth.accessToken), ["settings-token"])
+        XCTAssertEqual(candidates.map(\.inferenceOnly), [true])
+        XCTAssertEqual(candidates.map(\.source), [.environment])
+        XCTAssertEqual(store.liveUsageAvailability(candidates[0]), .inferenceOnlyToken)
+
+        // `settings.local.json` overrides `settings.json`, like Claude Code.
+        files.files[work + "/settings.local.json"] = #"{"env":{"CLAUDE_CODE_OAUTH_TOKEN":" local-token "}}"#
+        XCTAssertEqual(store.loadCredentialCandidates().map(\.oauth.accessToken), ["local-token"])
+
+        // A real login in the home's Keychain item wins for live usage; the token stays as fallback.
+        let digest = SHA256.hash(data: Data(work.precomposedStringWithCanonicalMapping.utf8))
+        let scoped = "Claude Code-credentials-" + String(digest.map { String(format: "%02x", $0) }.joined().prefix(8))
+        keychain.currentUserValues[scoped] = credentials("work-account")
+        XCTAssertEqual(store.loadCredentialCandidates().map(\.oauth.accessToken), ["work-account", "local-token"])
+
+        // A default-home store never reads another home's settings files.
+        let defaultStore = ClaudeAuthStore(environment: FakeEnvironment([:]), files: files, keychain: keychain)
+        XCTAssertEqual(defaultStore.loadCredentialCandidates().map(\.oauth.accessToken), ["default-account"])
+    }
+
+    func testUnattributedSessionsBelongToTheHomeThatWroteThem() async throws {
+        let pricing = ModelPricing(supplement: PricingSupplement(),
+                                   primary: PricingCatalog(entries: [:]), secondary: PricingCatalog(entries: [:]))
+        let now = Date()
+        let stamp = OpenUsageISO8601.string(from: now)
+        let userHome = try ClaudeLogFixture.makeUserHome(claudeFiles: [
+            "p/default.jsonl": ClaudeLogFixture.usageLine(timestamp: stamp, input: 10, costUSD: 0.1, messageID: "m1", requestID: "r1"),
+        ])
+        defer { try? FileManager.default.removeItem(at: userHome) }
+        let work = userHome.appendingPathComponent(".claude-work").path
+        let workProject = URL(fileURLWithPath: work).appendingPathComponent("projects/p")
+        try FileManager.default.createDirectory(at: workProject, withIntermediateDirectories: true)
+        try ClaudeLogFixture.usageLine(timestamp: stamp, input: 20, costUSD: 0.2, messageID: "m2", requestID: "r2")
+            .write(to: workProject.appendingPathComponent("work.jsonl"), atomically: true, encoding: .utf8)
+
+        // The default home is signed in to account A, as Claude Code's own `.claude.json` would say.
+        let defaultLogin = "\(userA)|\(orgA)"
+        func scanner(org: String, user: String, owned: [String], ownsDefault: Bool) -> ClaudeLogUsageScanner {
+            ClaudeLogUsageScanner(
+                environment: FakeEnvironment([:]), homeDirectory: { userHome },
+                incrementalScanner: IncrementalJSONLScanner<ClaudeLogUsageScanner.Entry>(),
+                accountUUID: user, organizationUUID: org, allowsUnattributedSessions: false,
+                currentDefaultLoginIdentity: { ownsDefault ? defaultLogin : nil },
+                additionalConfigDirectories: [work], ownedUnattributedDirectories: owned
+            )
+        }
+        // Neither session records an owner. The pinned card owns its home; the default card owns
+        // the default home; a card with neither claim sees nothing.
+        let workScan = await scanner(org: orgB, user: userB, owned: [work], ownsDefault: false).scan(now: now, pricing: pricing)
+        XCTAssertEqual(workScan?.series.daily.map(\.totalTokens), [20])
+        let defaultScan = await scanner(org: orgA, user: userA, owned: [], ownsDefault: true).scan(now: now, pricing: pricing)
+        XCTAssertEqual(defaultScan?.series.daily.map(\.totalTokens), [10])
+        let unclaimed = await scanner(org: orgA, user: userA, owned: [], ownsDefault: false).scan(now: now, pricing: pricing)
+        XCTAssertNil(unclaimed)
+    }
 }

@@ -22,7 +22,8 @@ enum ProviderCatalog {
                 let scanner = ClaudeLogUsageScanner(
                     accountUUID: user, organizationUUID: card.organizationID,
                     allowsUnattributedSessions: card.allowsUnattributedPiUsage,
-                    additionalConfigDirectories: card.additionalLogDirectories
+                    additionalConfigDirectories: card.additionalLogDirectories,
+                    ownedUnattributedDirectories: card.configDirectory.map { [$0] } ?? []
                 )
                 return ClaudeProvider(
                     provider: ClaudeProvider.makeProvider(

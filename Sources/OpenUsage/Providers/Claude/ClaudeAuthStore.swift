@@ -171,16 +171,41 @@ struct ClaudeAuthStore: Sendable {
             stored = stored.filter { liveUsageAvailability($0) == .available }
                 + stored.filter { liveUsageAvailability($0) != .available }
         }
-        let candidates = desktopOnly || isScopedHome ? stored : applyingEnvironmentToken(to: stored)
+        // A Swap profile never mixes in an environment token. An additional home honours only the
+        // `claude setup-token` value pinned in its own settings files, never the process environment,
+        // so a token exported for one account cannot leak into another card.
+        let token = configDirectory != nil ? settingsOAuthToken() : envText("CLAUDE_CODE_OAUTH_TOKEN")
+        let candidates = desktopOnly || swapAccount != nil ? stored : applyingEnvironmentToken(to: stored, token: token)
         return ClaudeCredentialLoad(candidates: candidates, desktopStatus: desktopStatus)
+    }
+
+    /// Claude Code applies `env.CLAUDE_CODE_OAUTH_TOKEN` from a home's `settings.json`, with
+    /// `settings.local.json` taking precedence. Read the same way so a home signed in through
+    /// `claude setup-token` still counts as logged in (inference-only: spend tiles, no live meters).
+    private func settingsOAuthToken() -> String? {
+        guard let configDirectory else { return nil }
+        for name in ["settings.local.json", "settings.json"] {
+            guard let text = try? files.readTextIfPresent("\(configDirectory)/\(name)"),
+                  let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+                  let env = object["env"] as? [String: Any],
+                  let token = (env["CLAUDE_CODE_OAUTH_TOKEN"] as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !token.isEmpty
+            else { continue }
+            AppLog.debug(LogTag.auth("claude"), "using setup-token from \(name) of the additional home")
+            return token
+        }
+        return nil
     }
 
     func loadCredentialCandidates() -> [ClaudeCredentialState] {
         loadCredentialSet().candidates
     }
 
-    private func applyingEnvironmentToken(to stored: [ClaudeCredentialState]) -> [ClaudeCredentialState] {
-        guard let envAccessToken = envText("CLAUDE_CODE_OAUTH_TOKEN") else {
+    private func applyingEnvironmentToken(
+        to stored: [ClaudeCredentialState], token: String?
+    ) -> [ClaudeCredentialState] {
+        guard let envAccessToken = token else {
             return stored
         }
         // An explicit `CLAUDE_CODE_OAUTH_TOKEN` is inference-only (typically a `claude setup-token`
