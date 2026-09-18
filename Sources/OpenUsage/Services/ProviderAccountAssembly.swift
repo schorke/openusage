@@ -280,10 +280,21 @@ struct ProviderAccountAssembly {
             identityKeys[record.id] = account.identityKey
         }
         for entry in additionalClaudeHomes {
-            // The default login or a Swap slot already answers for this account: the home is only
-            // one more log root for that card (attached below), never a duplicate card.
-            guard !cards.contains(where: { $0.identityKey == entry.identityKey }),
-                  let record = records.first(where: {
+            if let index = cards.firstIndex(where: { $0.identityKey == entry.identityKey }) {
+                // The account already has a card. A Desktop-only card gains the home's own CLI
+                // login (Desktop stays its fallback); a default-login or Swap card just gets the
+                // home as one more log root below. Never a duplicate card.
+                let existing = cards[index]
+                guard existing.usesDesktopCredentials, existing.configDirectory == nil else { continue }
+                cards[index] = ClaudeAccountCard(
+                    id: existing.id, identityKey: existing.identityKey, organizationID: existing.organizationID,
+                    displayName: existing.displayName, usesDesktopCredentials: false,
+                    allowsUnattributedPiUsage: existing.allowsUnattributedPiUsage,
+                    organizationName: existing.organizationName, configDirectory: entry.home
+                )
+                continue
+            }
+            guard let record = records.first(where: {
                       $0.family == "claude" && $0.identityKey == entry.identityKey && !$0.removedTombstone
                   })
             else { continue }
