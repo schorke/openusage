@@ -97,6 +97,9 @@ final class WidgetDataStore {
     /// `.failed` only, never the cache-hit/skip/backoff outcomes that the 5-minute timer produces in
     /// bulk — so the recorder can roll daily usage and error counts up into one event per provider per
     /// day. `nil` (and so a no-op) in tests and previews. Not observable UI state.
+    /// The card name a quota notification shows — the user's name when the card has one. `nil` (the
+    /// generated provider name) in tests and the CLI. Not observable UI state.
+    @ObservationIgnored var providerDisplayName: (@MainActor (String) -> String?)?
     @ObservationIgnored var onRefreshOutcome: (@MainActor (String, RefreshOutcome, ErrorCategory?, Bool) -> Void)?
     /// Wired by `ICloudUsageSyncStore`; debounced there so a concurrent provider batch produces one file.
     @ObservationIgnored var onLocalHistoryChanged: (@MainActor () -> Void)?
@@ -263,7 +266,9 @@ final class WidgetDataStore {
             metrics: metrics,
             toggles: toggles,
             now: now,
-            providerName: { [providersByID] id in providersByID[id]?.provider.displayName ?? id },
+            providerName: { [providersByID, providerDisplayName] id in
+                providerDisplayName?(id) ?? providersByID[id]?.provider.displayName ?? id
+            },
             post: postNotification
         )
     }

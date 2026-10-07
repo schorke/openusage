@@ -93,9 +93,10 @@ every card regardless.
 
 ### Card names
 
-To give a Codex account card your own name, use the same `openusage.cardNames` setting as Claude
-(see [Card names](claude.md#card-names)), keyed by the Codex card id (`codex`, `codex@<hash>`).
-The `openusage.cardColors` setting described there sets Codex card colors in the same way.
+To give a Codex account card your own name, double-click the card's name in the dashboard, or
+right-click its header and choose **Rename…** (see [Card names](../dashboard.md#card-names)). The
+`openusage.cardColors` setting described in [Claude card names](claude.md#card-names) sets Codex card
+colors by card id (`codex`, `codex@<hash>`).
 
 ## The spend tiles
 

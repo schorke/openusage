@@ -134,17 +134,12 @@ Claude Swap account rotates that home.
 ## Card names
 
 Each account card gets a generated name such as `Claude — me@example.com (Org)`. To choose your own
-name, set it by card id:
+name, double-click the card's name in the dashboard, or right-click its header and choose
+**Rename…** (see [Card names](../dashboard.md#card-names)). The names are kept by card id in the
+`openusage.cardNames` setting. The card id shows in the log line
+`accounts: additional Claude home resolved (claude@<hash>)`. The first account is always `claude`.
 
-```sh
-defaults write com.robinebers.openusage openusage.cardNames -dict-add claude "Claude - Work" claude@ab12cd34 "Claude - Personal"
-```
-
-The card id shows in the log line `accounts: additional Claude home resolved (claude@<hash>)`. The
-first account is always `claude`. The same setting names Codex cards (`codex`, `codex@<hash>`).
-Restart OpenUsage after you change a name.
-
-To choose the color of a card in the Total Spend ring and legend, set it by card id in the same way:
+To choose the color of a card in the Total Spend ring and legend, set it by card id:
 
 ```sh
 defaults write com.robinebers.openusage openusage.cardColors -dict-add claude "#1b3016,#3f6b35" claude@ab12cd34 "#ff5911"

@@ -17,6 +17,12 @@ struct Provider: Identifiable, Hashable {
         self.links = links
     }
 
+    /// The same provider under a user-chosen name, or unchanged when `name` is `nil`.
+    func renamed(_ name: String?) -> Provider {
+        guard let name, name != displayName else { return self }
+        return Provider(id: id, displayName: name, icon: icon, links: links)
+    }
+
     /// Links safe to render: trimmed, non-empty label and URL, and an `http(s)` scheme only. Mirrors the
     /// legacy `visibleLinks` filter so a malformed entry never ships a dead or no-op button.
     var visibleLinks: [ProviderLink] {

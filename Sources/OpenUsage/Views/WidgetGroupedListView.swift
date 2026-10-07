@@ -20,6 +20,8 @@ struct WidgetGroupedListView: View {
     @State private var frameStore = ReorderFrameStore()
     @State private var activeProviderID: String?
     @State private var activeMetricID: String?
+    /// The card whose header name is in inline edit (double-click or "Rename…"), if any.
+    @State private var renamingProviderID: String?
     @AppStorage(DensitySetting.key) private var density = DensitySetting.regular
 
     @Environment(\.codexResetClaims) private var codexResetClaims
@@ -53,12 +55,28 @@ struct WidgetGroupedListView: View {
             warning: dataStore.headerNotice(for: group.provider.id),
             refreshing: dataStore.refreshingProviderIDs.contains(group.provider.id),
             staleness: dataStore.stalenessHint(for: group.provider.id),
-            onCopyScreenshot: { shareCard(group) }
+            onCopyScreenshot: { shareCard(group) },
+            isRenaming: renamingBinding(for: group.provider.id),
+            generatedName: layout.generatedName(for: group.provider.id),
+            onRename: { layout.renameProvider(group.provider.id, to: $0) }
         )
         // Keep the provider mark and hover-revealed copy control aligned with the card's content edges.
         .padding(.horizontal, 8)
-        .highPriorityGesture(providerDragGesture(for: group))
+        // A drag inside the name field selects text, so the header drag pauses during a rename.
+        .highPriorityGesture(
+            providerDragGesture(for: group),
+            including: renamingProviderID == group.provider.id ? .subviews : .all
+        )
         .contextMenu {
+            Button("Rename…") {
+                renamingProviderID = group.provider.id
+            }
+            if layout.hasCustomName(group.provider.id), let generated = layout.generatedName(for: group.provider.id) {
+                Button("Restore Name “\(generated)”") {
+                    layout.renameProvider(group.provider.id, to: "")
+                }
+            }
+            Divider()
             // Hides the whole provider section (the Customize provider list brings it back). Mirrors
             // the per-metric "Hide" but one level up, so the verb order reads the same on a header as a row.
             Button("Hide \(group.provider.displayName)") {
@@ -74,6 +92,19 @@ struct WidgetGroupedListView: View {
             Divider()
             Button("Share Screenshot") { _ = shareCard(group) }
         }
+    }
+
+    private func renamingBinding(for providerID: String) -> Binding<Bool> {
+        Binding(
+            get: { renamingProviderID == providerID },
+            set: { isRenaming in
+                if isRenaming {
+                    renamingProviderID = providerID
+                } else if renamingProviderID == providerID {
+                    renamingProviderID = nil
+                }
+            }
+        )
     }
 
     /// Renders the provider's branded share card and copies the PNG to the clipboard. The appearance is

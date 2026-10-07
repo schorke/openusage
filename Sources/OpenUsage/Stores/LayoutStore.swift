@@ -102,7 +102,13 @@ final class LayoutStore {
         didSet { persistence.saveMenuBarStyle(menuBarStyle) }
     }
 
-    let registry: WidgetRegistry
+    /// The providers under their user-chosen card names. Rebuilt from `generatedRegistry` on each
+    /// rename, so every view that reads a provider through this store shows the new name at once.
+    private(set) var registry: WidgetRegistry
+    /// The providers under their generated names — the fallback a cleared card name restores.
+    private let generatedRegistry: WidgetRegistry
+    private(set) var cardNames: CardNamesSetting
+    private let defaults: UserDefaults
     private let persistence: LayoutPersistence
     private let defaultMetricIDs: [String]
     private let defaultPinnedMetricIDs: [String]
@@ -120,7 +126,11 @@ final class LayoutStore {
         defaultExpandedMetricIDs: [String] = DefaultLayout.expandedMetricIDs,
         isProviderEnabled: @escaping @MainActor (String) -> Bool = { _ in true }
     ) {
-        self.registry = registry
+        let cardNames = CardNamesSetting(defaults: defaults)
+        self.generatedRegistry = registry
+        self.registry = registry.renamed(cardNames)
+        self.cardNames = cardNames
+        self.defaults = defaults
         let persistence = LayoutPersistence(defaults: defaults, storageKey: storageKey)
         self.persistence = persistence
         self.defaultMetricIDs = defaultMetricIDs
@@ -151,6 +161,30 @@ final class LayoutStore {
         if initial.shouldPersistExpanded { persistExpanded() }
         if let seededDefaults = initial.seededDefaultsToPersist { persistSeededDefaults(seededDefaults) }
         syncPlacedOrder(persistChanges: initial.shouldPersistPlaced)
+    }
+
+    // MARK: - Card names
+
+    /// The provider's generated name — what the card shows when the user has not named it.
+    func generatedName(for providerID: String) -> String? {
+        generatedRegistry.provider(id: providerID)?.displayName
+    }
+
+    /// Whether the user has named this card.
+    func hasCustomName(_ providerID: String) -> Bool {
+        cardNames.names[providerID] != nil
+    }
+
+    /// Renames a card and persists the name under `CardNamesSetting.key`. A blank name restores the
+    /// generated name.
+    func renameProvider(_ providerID: String, to name: String) {
+        guard let generated = generatedName(for: providerID) else { return }
+        var next = cardNames
+        next.setName(name, for: providerID, generated: generated)
+        guard next != cardNames else { return }
+        cardNames = next
+        registry = generatedRegistry.renamed(next)
+        next.save(to: defaults)
     }
 
     func isProviderExpanded(_ providerID: String) -> Bool {

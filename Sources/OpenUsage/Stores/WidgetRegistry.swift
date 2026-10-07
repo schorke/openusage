@@ -64,6 +64,14 @@ struct WidgetRegistry: Sendable {
         }
     }
 
+    /// The same registry with each provider under its user-chosen card name (see `CardNamesSetting`).
+    func renamed(_ cardNames: CardNamesSetting) -> WidgetRegistry {
+        WidgetRegistry(
+            providers: providers.map { $0.renamed(cardNames.names[$0.id]) },
+            descriptors: descriptors
+        )
+    }
+
     @MainActor
     static func from(_ runtimes: [ProviderRuntime]) -> WidgetRegistry {
         let providers = runtimes.map(\.provider)

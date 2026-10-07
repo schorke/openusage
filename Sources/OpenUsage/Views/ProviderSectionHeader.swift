@@ -24,6 +24,13 @@ struct ProviderSectionHeader: View {
     /// Dashboard-only screenshot action. The reorder preview omits it, while Customize uses its own
     /// row type and is unaffected by this header.
     var onCopyScreenshot: (() -> Bool)?
+    /// Dashboard-only inline rename. While it is `true`, a text field replaces the name. A double-click
+    /// on the name sets it; the caller's context menu sets it too. `nil` in the reorder preview.
+    var isRenaming: Binding<Bool>?
+    /// The name an empty rename restores — shown as the field's placeholder.
+    var generatedName: String?
+    /// Saves the edited name. A blank name restores `generatedName`.
+    var onRename: ((String) -> Void)?
 
     /// Header type and icon track the density setting like the rows do, so Compact shrinks the
     /// whole section anatomy — not just the rows under it.
@@ -38,7 +45,10 @@ struct ProviderSectionHeader: View {
         warning: String? = nil,
         refreshing: Bool = false,
         staleness: StalenessHint? = nil,
-        onCopyScreenshot: (() -> Bool)? = nil
+        onCopyScreenshot: (() -> Bool)? = nil,
+        isRenaming: Binding<Bool>? = nil,
+        generatedName: String? = nil,
+        onRename: ((String) -> Void)? = nil
     ) {
         self.provider = provider
         self.plan = plan
@@ -46,6 +56,9 @@ struct ProviderSectionHeader: View {
         self.refreshing = refreshing
         self.staleness = staleness
         self.onCopyScreenshot = onCopyScreenshot
+        self.isRenaming = isRenaming
+        self.generatedName = generatedName
+        self.onRename = onRename
     }
 
     var body: some View {
@@ -60,10 +73,7 @@ struct ProviderSectionHeader: View {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
                 // Give the plan first choice of the available width, while still allowing an oversized
                 // plan to truncate. Account names and the lower-priority stale tag yield space first.
-                Text(provider.displayName)
-                    .font(.system(size: density.headerPointSize, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                name
                     .layoutPriority(1)
                 if let plan {
                     ProviderPlanBadge(plan: plan)
@@ -105,6 +115,76 @@ struct ProviderSectionHeader: View {
         .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
+    }
+
+    @ViewBuilder
+    private var name: some View {
+        if let isRenaming, let onRename, isRenaming.wrappedValue {
+            CardNameField(
+                name: provider.displayName,
+                placeholder: generatedName ?? provider.displayName,
+                pointSize: density.headerPointSize,
+                onCommit: { newName in
+                    isRenaming.wrappedValue = false
+                    onRename(newName)
+                },
+                onCancel: { isRenaming.wrappedValue = false }
+            )
+        } else if let isRenaming, onRename != nil {
+            nameText
+                .onTapGesture(count: 2) { isRenaming.wrappedValue = true }
+                .accessibilityAction(named: "Rename") { isRenaming.wrappedValue = true }
+        } else {
+            nameText
+        }
+    }
+
+    private var nameText: some View {
+        Text(provider.displayName)
+            .font(.system(size: density.headerPointSize, weight: .semibold))
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+    }
+}
+
+/// The inline editor that replaces a card's name during a rename, in the same type as the name so
+/// nothing moves. It works like a Finder rename: Return saves, Esc cancels, and a click elsewhere
+/// saves. The placeholder shows the generated name, which an empty field restores.
+struct CardNameField: View {
+    let name: String
+    let placeholder: String
+    let pointSize: CGFloat
+    let onCommit: (String) -> Void
+    let onCancel: () -> Void
+
+    @State private var draft = ""
+    /// Set by the first of Return, Esc, or focus loss, so one edit never saves twice.
+    @State private var isFinished = false
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField(placeholder, text: $draft)
+            .textFieldStyle(.plain)
+            .font(.system(size: pointSize, weight: .semibold))
+            .lineLimit(1)
+            .focused($isFocused)
+            .onSubmit { finish(save: true) }
+            .onExitCommand { finish(save: false) }
+            .onChange(of: isFocused) { wasFocused, isFocusedNow in
+                if wasFocused, !isFocusedNow { finish(save: true) }
+            }
+            .onAppear {
+                draft = name
+                // The popover panel takes focus a moment after the field appears, so focus next turn.
+                Task { @MainActor in isFocused = true }
+            }
+            .accessibilityLabel("Card Name")
+    }
+
+    private func finish(save: Bool) {
+        guard !isFinished else { return }
+        isFinished = true
+        if save { onCommit(draft) } else { onCancel() }
     }
 }
 

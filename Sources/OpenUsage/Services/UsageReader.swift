@@ -133,7 +133,7 @@ public struct UsageReader {
         let state = LocalUsageAPI.State(
             enabledOrderedIDs: enabledOrderedIDs,
             knownIDs: knownIDs,
-            snapshots: snapshots,
+            snapshots: CardNamesSetting(defaults: defaults).applied(to: snapshots),
             limitDescriptors: registry.limitDescriptorsByProvider,
             errors: errors
         )

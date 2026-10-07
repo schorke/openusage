@@ -3,7 +3,8 @@ import Foundation
 /// Latest normalized output for one provider refresh.
 struct ProviderSnapshot: Hashable, Sendable, Codable {
     let providerID: String
-    let displayName: String
+    /// `var` so the app can show a card under its user-chosen name (see `CardNamesSetting`).
+    var displayName: String
     var plan: String?
     var lines: [MetricLine]
     var refreshedAt: Date

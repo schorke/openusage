@@ -52,7 +52,24 @@ Rows with a reset date tick every 30 seconds, so countdowns and pace stay live b
 ## Right-click menus
 
 Every row: **Hide · Star for menu bar / Unstar · Refresh \<provider\> · Customize…** (Customize opens straight to that provider's metrics.)
-Provider headers: **Hide \<provider\> · Refresh \<provider\> · Customize…** (Hide turns the whole provider off; turn it back on in Customize. Customize opens straight to that provider's metrics.) plus **Share Screenshot** (see below).
+Provider headers: **Rename… · Hide \<provider\> · Refresh \<provider\> · Customize…** (Rename edits the card's name in place — see [Card names](#card-names). A renamed card also shows **Restore Name**. Hide turns the whole provider off; turn it back on in Customize. Customize opens straight to that provider's metrics.) plus **Share Screenshot** (see below).
+
+## Card names
+
+Give any card your own name, for example "Claude - Work" and "Claude - Personal" when you use two
+accounts. There are three ways to start:
+
+- Double-click the card's name in its header.
+- Right-click the header and choose **Rename…**.
+- Open the card's Customize detail and edit its **Name** field.
+
+Type the name and press **Return** to save it. Press **Esc** to cancel, or click elsewhere to save.
+The new name shows at once in the dashboard, Customize, the Total Spend legend, notifications, and the
+local HTTP API. To go back to the generated name, clear the field, or choose **Restore Name** in the
+header's right-click menu (**Restore** in Customize). The field shows the generated name while it is
+empty. The Reset buttons in Customize do not change card names.
+
+Names are kept by card id in the `openusage.cardNames` setting. The one-shot CLI uses the same names.
 
 ## Share
 
@@ -88,7 +105,7 @@ When OpenUsage ships a new default metric, existing layouts get it once. If you 
 | Key | Action |
 |---|---|
 | Return | From the dashboard, open Customize; from a provider detail, return to the provider list; from the provider list or Settings, return to the dashboard |
-| Esc | From a provider detail, return to the provider list; from the provider list or Settings, return to the dashboard; from the dashboard, close the popover |
+| Esc | While you rename a card, cancel the rename; from a provider detail, return to the provider list; from the provider list or Settings, return to the dashboard; from the dashboard, close the popover |
 | ⌘Z | Undo the last customization change (app-wide; repeat to step back) |
 | ⌘R | Refresh now from the dashboard or Settings (skips the cache) |
 | ⌘, | Open / close Settings (in the popover) |

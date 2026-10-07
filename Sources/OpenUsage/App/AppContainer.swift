@@ -199,6 +199,7 @@ final class AppContainer {
                 )
             }
         )
+        dataStore.providerDisplayName = { [weak layout] id in layout?.provider(id: id)?.displayName }
         dataStore.onRefreshOutcome = { [weak telemetry] providerID, outcome, category, manual in
             telemetry?.record(providerID: providerID, outcome: outcome, category: category, manual: manual)
         }
@@ -209,7 +210,7 @@ final class AppContainer {
             LocalUsageAPI.State(
                 enabledOrderedIDs: layout.orderedProviderIDs().filter { enablement.isEnabled($0) },
                 knownIDs: Set(registry.providers.map(\.id)),
-                snapshots: dataStore.snapshots,
+                snapshots: layout.cardNames.applied(to: dataStore.snapshots),
                 limitDescriptors: registry.limitDescriptorsByProvider,
                 errors: dataStore.providerErrors
             )
