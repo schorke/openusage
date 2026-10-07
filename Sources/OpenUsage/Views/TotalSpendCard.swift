@@ -397,7 +397,12 @@ enum TotalSpendPalette {
         hex(0x34C759), hex(0x5856D6), hex(0xFF2D55), hex(0xA2845E)
     ]
 
-    static func color(for providerID: String) -> Color {
+    /// A user color from `openusage.cardColors` wins over the brand tint, so two accounts of the
+    /// same provider can carry their own colors.
+    static func color(
+        for providerID: String, cardColors: CardColorsSetting = CardColorsSetting(defaults: .standard)
+    ) -> Color {
+        if let custom = cardColors.colors[providerID] { return dynamic(light: custom.light, dark: custom.dark) }
         if let brand = byProviderID[providerID] { return brand }
         let stableHash = providerID.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
         return fallback[stableHash % fallback.count]

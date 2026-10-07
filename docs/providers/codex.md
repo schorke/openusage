@@ -91,6 +91,12 @@ spending goes to the account signed in to that home right now.
 With one account, all of this lands on its single card. Live limits and reset-credit actions work on
 every card regardless.
 
+### Card names
+
+To give a Codex account card your own name, use the same `openusage.cardNames` setting as Claude
+(see [Card names](claude.md#card-names)), keyed by the Codex card id (`codex`, `codex@<hash>`).
+The `openusage.cardColors` setting described there sets Codex card colors in the same way.
+
 ## The spend tiles
 
 Copied sessions count once per card; a session copied into two accounts' folders counts on both. Synced history must match the card's account and workspace.

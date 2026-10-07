@@ -13,6 +13,7 @@ enum ProviderCatalog {
         // Default provider order (see AGENTS.md "## Providers"): the three established providers first,
         // then every other provider alphabetically by display name.
         var providers: [ProviderRuntime]
+        let cardNames = CardNamesSetting(defaults: defaults)
         if claudeCards.isEmpty {
             providers = [ClaudeProvider()]
         } else {
@@ -28,7 +29,9 @@ enum ProviderCatalog {
                 return ClaudeProvider(
                     provider: ClaudeProvider.makeProvider(
                         id: card.id,
-                        displayName: claudeCards.count == 1 ? "Claude" : card.displayName
+                        displayName: cardNames.name(
+                            for: card.id, generated: claudeCards.count == 1 ? "Claude" : card.displayName
+                        )
                     ),
                     authStore: ClaudeAuthStore(
                         desktopOrganization: card.organizationID,
@@ -56,7 +59,9 @@ enum ProviderCatalog {
         } else {
             providers += codex.cards.map { card in
                 CodexProvider(
-                    provider: CodexProvider.makeProvider(id: card.id, displayName: card.displayName),
+                    provider: CodexProvider.makeProvider(
+                        id: card.id, displayName: cardNames.name(for: card.id, generated: card.displayName)
+                    ),
                     authStore: CodexAuthStore(
                         expectedIdentity: card.identity,
                         additionalAuthHomes: card.authHomes,
