@@ -1,10 +1,11 @@
 import Foundation
 
-/// The spend period the Total Spend card can show — matching the three per-provider spend tiles
-/// `SpendTileMapper` emits, whose line labels double as the lookup keys here.
+/// The spend period the Total Spend card can show — matching the period lines `SpendTileMapper`
+/// emits, whose labels double as the lookup keys here.
 enum TotalSpendPeriod: String, CaseIterable, Identifiable, Sendable {
     case today = "Today"
     case yesterday = "Yesterday"
+    case last7 = "Last 7 Days"
     case last30 = "Last 30 Days"
 
     var id: String { rawValue }
@@ -13,12 +14,13 @@ enum TotalSpendPeriod: String, CaseIterable, Identifiable, Sendable {
     /// but kept as its own accessor so the two meanings can diverge without a hunt).
     var lineLabel: String { rawValue }
 
-    /// Compact segment title for the period switcher — "Last 30 Days" doesn't fit three-across
+    /// Compact segment title for the period switcher — "Last 30 Days" doesn't fit four-across
     /// in the 320pt popover without shrinking every segment.
     var shortLabel: String {
         switch self {
         case .today: "Today"
         case .yesterday: "Yesterday"
+        case .last7: "7 Days"
         case .last30: "30 Days"
         }
     }

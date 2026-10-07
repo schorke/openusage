@@ -182,7 +182,7 @@ enum UsageHistoryAggregator {
 }
 
 enum UsageHistorySnapshotRenderer {
-    private static let historyLabels: Set<String> = ["Today", "Yesterday", "Last 30 Days", "Usage Trend"]
+    private static let historyLabels: Set<String> = ["Today", "Yesterday", "Last 7 Days", "Last 30 Days", "Usage Trend"]
 
     static func render(
         local snapshot: ProviderSnapshot,

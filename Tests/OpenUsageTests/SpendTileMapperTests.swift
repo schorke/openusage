@@ -118,6 +118,35 @@ final class SpendTileMapperTests: XCTestCase {
         ])
     }
 
+    func testLast7DaysCoversTodayAndTheSixDaysBefore() throws {
+        let lines = mappedLines(
+            [
+                DailyUsageEntry(date: "2026-06-26", totalTokens: 100, costUSD: 1),
+                DailyUsageEntry(date: "2026-06-20", totalTokens: 200, costUSD: 2),
+                DailyUsageEntry(date: "2026-06-19", totalTokens: 400, costUSD: 4)
+            ],
+            models: [
+                DailyModelUsageEntry(date: "2026-06-26", models: [ModelUsageEntry(model: "alpha", totalTokens: 100, costUSD: 1)]),
+                DailyModelUsageEntry(date: "2026-06-20", models: [ModelUsageEntry(model: "beta", totalTokens: 200, costUSD: 2)]),
+                DailyModelUsageEntry(date: "2026-06-19", models: [ModelUsageEntry(model: "gamma", totalTokens: 400, costUSD: 4)])
+            ]
+        )
+
+        XCTAssertEqual(values(lines, "Last 7 Days"), [
+            MetricValue(number: 3, kind: .dollars, estimated: true),
+            MetricValue(number: 300, kind: .count, label: "tokens")
+        ])
+        let week = try XCTUnwrap(modelBreakdown(lines, "Last 7 Days"))
+        XCTAssertEqual(week.models.map(\.model), ["beta", "alpha"])
+        XCTAssertEqual(lines.map(\.label).filter { $0.hasPrefix("Last") }, ["Last 7 Days", "Last 30 Days"])
+    }
+
+    func testLast7DaysOmittedWhenOnlyOlderDaysHaveUsage() {
+        let lines = mappedLines(series([("2026-06-19", 500)]))
+        XCTAssertNil(line(lines, "Last 7 Days"))
+        XCTAssertNotNil(line(lines, "Last 30 Days"))
+    }
+
     func testModelBreakdownSortsFoldsOtherAndKeepsUnpricedNamed() throws {
         let lines = mappedLines(
             [DailyUsageEntry(date: "2026-06-26", totalTokens: 3_700, costUSD: 49)],

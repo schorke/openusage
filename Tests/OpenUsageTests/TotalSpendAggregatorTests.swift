@@ -62,6 +62,21 @@ final class TotalSpendAggregatorTests: XCTestCase {
         XCTAssertEqual(total.slices.map(\.provider.id), ["claude"])
     }
 
+    func testLast7PeriodReadsTheLast7DaysLine() {
+        let snapshots = [
+            "claude": snapshot(claude, lines: [
+                spendLine("Today", dollars: 1.00),
+                spendLine("Last 7 Days", dollars: 12.00),
+                spendLine("Last 30 Days", dollars: 40.00)
+            ])
+        ]
+
+        let total = TotalSpendAggregator.total(for: .last7, providers: [claude], snapshots: snapshots)
+
+        XCTAssertEqual(TotalSpendPeriod.allCases, [.today, .yesterday, .last7, .last30])
+        XCTAssertEqual(total.totalUSD, 12.00, accuracy: 0.0001)
+    }
+
     func testTokensOnlyLineContributesTokensButNotSpendOrCostPerMtok() {
         let tokensOnly = spendLine("Today", dollars: nil, tokens: 500_000)
         let snapshots = ["claude": snapshot(claude, lines: [tokensOnly])]

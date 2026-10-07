@@ -24,7 +24,7 @@ without that information is excluded from Swap cards. Codex installations withou
 keep their existing sync behavior. Each Mac counts a Codex folder's spending for the account signed
 in to that folder, so the same history never appears on two cards.
 
-OpenUsage combines the valid files in memory and rebuilds Today, Yesterday, Last 30 Days, Usage Trend,
+OpenUsage combines the valid files in memory and rebuilds Today, Yesterday, Last 7 Days, Last 30 Days, Usage Trend,
 unknown-model warnings, and model breakdowns. The same combined spend rows feed the dashboard, Total
 Spend, menu-bar pins, share cards, and the local HTTP API. Both `/v1/usage` and `/v1/limits` read the
 same rendered snapshots; the former is the deprecated UI-oriented format and the latter is the

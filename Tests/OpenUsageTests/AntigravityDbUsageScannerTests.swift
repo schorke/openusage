@@ -338,7 +338,7 @@ final class AntigravityDbUsageScannerTests: XCTestCase {
 
         let snapshot = await provider.refresh()
         XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(snapshot.lines.map(\.label), ["Session", "Today", "Last 30 Days", "Usage Trend"])
+        XCTAssertEqual(snapshot.lines.map(\.label), ["Session", "Today", "Last 7 Days", "Last 30 Days", "Usage Trend"])
         XCTAssertEqual(snapshot.usageHistory?.series.daily.first?.totalTokens, 1_500_000)
 
         let total = TotalSpendAggregator.total(

@@ -1,6 +1,7 @@
 import Foundation
 
-/// Turns local daily token/cost data into the shared Today / Yesterday / Last 30 Days spend tiles.
+/// Turns local daily token/cost data into the shared Today / Yesterday / Last 30 Days spend tiles,
+/// plus the Last 7 Days total the Total Spend card sums.
 /// Every spend-tracking provider funnels through here so the tiles render identically regardless of
 /// source: Claude / Codex / Grok feed token/cost from their CLI logs, while Cursor feeds token/cost
 /// derived from its CSV export. The data shape
@@ -53,6 +54,29 @@ enum SpendTileMapper {
                                         sourceNote: modelSourceNote,
                                         fallbackPricingModelsByDay: fallbackPricingModelsByDay
                                       )))
+        }
+
+        // Last 7 Days feeds only the Total Spend card's period switcher; no provider row reads it.
+        let weekDays = Set((0..<7).compactMap { offset in
+            Calendar.current.date(byAdding: .day, value: -offset, to: now).map(dayKey(from:))
+        })
+        let week = usage.daily.filter { dayKey(fromUsageDate: $0.date).map(weekDays.contains) == true }
+        let weekTokens = week.reduce(0) { $0 + $1.totalTokens }
+        let weekCostSamples = week.compactMap(\.costUSD)
+        let weekCost = weekCostSamples.isEmpty ? nil : weekCostSamples.reduce(0, +)
+        if weekTokens > 0 || (weekCost ?? 0) > 0 {
+            let weekUnknown = weekDays.reduce(into: Set<String>()) { $0.formUnion(unknownModelsByDay[$1] ?? []) }
+            lines.append(.values(label: "Last 7 Days",
+                                 values: spendValues(tokens: weekTokens, costUSD: weekCost, estimated: estimated),
+                                 unknownModels: sortedModels(weekUnknown),
+                                 modelBreakdown: modelBreakdown(
+                                    modelUsage,
+                                    days: weekDays,
+                                    totalTokens: weekTokens,
+                                    totalCostUSD: weekCost,
+                                    sourceNote: modelSourceNote,
+                                    fallbackPricingModelsByDay: fallbackPricingModelsByDay
+                                 )))
         }
 
         let totalTokens = usage.daily.reduce(0) { $0 + $1.totalTokens }
